@@ -30,18 +30,12 @@ public:
     // ── Constructors / Rule of Five ──────────────────────────────────────────
 
     // 1. Default constructor
-    SinglyLinkedList() noexcept : head_(nullptr), size_(0) {}
+    SinglyLinkedList() noexcept : head_(nullptr), tail_(nullptr) {}
 
     // Convenience: construct from initializer list
     SinglyLinkedList(std::initializer_list<T> il) : SinglyLinkedList() {
-        // Insert in reverse order to keep original sequence
-        Node<T>* prev_head = nullptr;
-        for (auto it = std::rbegin(il); it != std::rend(il); ++it) {
-            Node<T>* node = new Node<T>(*it, prev_head);
-            prev_head = node;
-        }
-        head_ = prev_head;
-        size_ = il.size();
+        for (const T& val : il)
+            push_back(val);
     }
 
     // 2. Destructor
@@ -64,22 +58,28 @@ public:
     // 5. Move constructor
     SinglyLinkedList(SinglyLinkedList&& other) noexcept
         : head_(std::exchange(other.head_, nullptr)),
-          size_(std::exchange(other.size_, 0)) {}
+          tail_(std::exchange(other.tail_, nullptr)) {}
 
     // 6. Move assignment operator
     SinglyLinkedList& operator=(SinglyLinkedList&& other) noexcept {
         if (this != &other) {
-            clear();                               // release own resources
+            clear();
             head_ = std::exchange(other.head_, nullptr);
-            size_ = std::exchange(other.size_, 0);
+            tail_ = std::exchange(other.tail_, nullptr);
         }
         return *this;
     }
 
     // ── Capacity ─────────────────────────────────────────────────────────────
 
-    [[nodiscard]] bool   empty() const noexcept { return size_ == 0; }
-    [[nodiscard]] size_t size()  const noexcept { return size_; }
+    [[nodiscard]] bool empty() const noexcept { return head_ == nullptr; }
+
+    // O(n) — no size member; traverse to count
+    [[nodiscard]] size_t size() const noexcept {
+        size_t count = 0;
+        for (Node<T>* cur = head_; cur; cur = cur->next) ++count;
+        return count;
+    }
 
     // ── Element access ───────────────────────────────────────────────────────
 
@@ -92,13 +92,20 @@ public:
         return head_->data;
     }
 
+    T& back() {
+        if (!tail_) throw std::out_of_range("back() called on empty list");
+        return tail_->data;
+    }
+    const T& back() const {
+        if (!tail_) throw std::out_of_range("back() called on empty list");
+        return tail_->data;
+    }
+
     T& at(size_t index) {
-        Node<T>* node = node_at(index);   // throws if out of range
-        return node->data;
+        return node_at(index)->data;   // throws if out of range
     }
     const T& at(size_t index) const {
-        Node<T>* node = node_at(index);
-        return node->data;
+        return node_at(index)->data;
     }
 
     // ── Modifiers ────────────────────────────────────────────────────────────
@@ -106,29 +113,30 @@ public:
     // O(1) – insert at front
     void push_front(const T& value) {
         head_ = new Node<T>(value, head_);
-        ++size_;
+        if (!tail_) tail_ = head_;
     }
     void push_front(T&& value) {
         head_ = new Node<T>(std::move(value), head_);
-        ++size_;
+        if (!tail_) tail_ = head_;
     }
 
-    // O(n) – insert at back
+    // O(1) – insert at back  (tail pointer makes this O(1))
     void push_back(const T& value) {
-        Node<T>* new_node = new Node<T>(value);
-        append_node(new_node);
+        Node<T>* node = new Node<T>(value);
+        link_tail(node);
     }
     void push_back(T&& value) {
-        Node<T>* new_node = new Node<T>(std::move(value));
-        append_node(new_node);
+        Node<T>* node = new Node<T>(std::move(value));
+        link_tail(node);
     }
 
     // O(n) – insert before the node currently at 'index'
     void insert(size_t index, const T& value) {
         if (index == 0) { push_front(value); return; }
-        Node<T>* prev = node_at(index - 1);
-        prev->next = new Node<T>(value, prev->next);
-        ++size_;
+        Node<T>* prev     = node_at(index - 1);    // throws if out of range
+        Node<T>* new_node = new Node<T>(value, prev->next);
+        prev->next = new_node;
+        if (!new_node->next) tail_ = new_node;      // inserted at the very end
     }
 
     // O(1) – remove front
@@ -136,19 +144,20 @@ public:
         if (!head_) throw std::out_of_range("pop_front() called on empty list");
         Node<T>* old = head_;
         head_ = head_->next;
+        if (!head_) tail_ = nullptr;                // list became empty
         delete old;
-        --size_;
     }
 
     // O(n) – remove node at 'index'
     void erase(size_t index) {
+        if (!head_) throw std::out_of_range("erase() called on empty list");
         if (index == 0) { pop_front(); return; }
-        Node<T>* prev = node_at(index - 1);
-        if (!prev->next) throw std::out_of_range("erase(): index out of range");
+        Node<T>* prev   = node_at(index - 1);       // throws if out of range
         Node<T>* target = prev->next;
+        if (!target) throw std::out_of_range("erase(): index out of range");
         prev->next = target->next;
+        if (!prev->next) tail_ = prev;              // erased the tail
         delete target;
-        --size_;
     }
 
     // Destroy all nodes
@@ -158,11 +167,12 @@ public:
             delete head_;
             head_ = tmp;
         }
-        size_ = 0;
+        tail_ = nullptr;
     }
 
     // Reverse the list in-place, O(n)
     void reverse() noexcept {
+        tail_ = head_;                              // old head becomes new tail
         Node<T>* prev    = nullptr;
         Node<T>* current = head_;
         while (current) {
@@ -178,15 +188,13 @@ public:
 
     void swap(SinglyLinkedList& other) noexcept {
         std::swap(head_, other.head_);
-        std::swap(size_, other.size_);
+        std::swap(tail_, other.tail_);
     }
 
     void print(std::ostream& os = std::cout) const {
-        Node<T>* cur = head_;
-        while (cur) {
+        for (Node<T>* cur = head_; cur; cur = cur->next) {
             os << cur->data;
             if (cur->next) os << " -> ";
-            cur = cur->next;
         }
         os << '\n';
     }
@@ -210,46 +218,36 @@ public:
 
 private:
     Node<T>* head_;
-    size_t   size_;
+    Node<T>* tail_;     // always points to the last node, or nullptr when empty
 
-    // Deep-copy helper
+    // Deep-copy helper — reuses push_back so tail_ is maintained automatically
     void copy_from(const SinglyLinkedList& other) {
-        Node<T>* src = other.head_;
-        if (!src) return;
-
-        head_ = new Node<T>(src->data);
-        Node<T>* dst = head_;
-        src = src->next;
-
-        while (src) {
-            dst->next = new Node<T>(src->data);
-            dst = dst->next;
-            src = src->next;
-        }
-        size_ = other.size_;
+        for (Node<T>* src = other.head_; src; src = src->next)
+            push_back(src->data);
     }
 
-    // Append a pre-allocated node at the tail
-    void append_node(Node<T>* new_node) {
-        if (!head_) {
-            head_ = new_node;
+    // Attach a pre-allocated node at the tail in O(1)
+    void link_tail(Node<T>* node) {
+        if (!tail_) {
+            head_ = tail_ = node;
         } else {
-            Node<T>* cur = head_;
-            while (cur->next) cur = cur->next;
-            cur->next = new_node;
+            tail_->next = node;
+            tail_ = node;
         }
-        ++size_;
     }
 
-    // Bounds-checked node lookup
+    // Bounds-checked node lookup — O(n), no size_ available
     Node<T>* node_at(size_t index) const {
-        if (index >= size_)
-            throw std::out_of_range("index " + std::to_string(index) +
-                                    " out of range (size=" +
-                                    std::to_string(size_) + ")");
         Node<T>* cur = head_;
-        for (size_t i = 0; i < index; ++i) cur = cur->next;
-        return cur;
+        size_t   i   = 0;
+        while (cur) {
+            if (i == index) return cur;
+            cur = cur->next;
+            ++i;
+        }
+        throw std::out_of_range("index " + std::to_string(index) +
+                                " out of range (size=" +
+                                std::to_string(i) + ")");
     }
 };
 
@@ -258,7 +256,6 @@ template <typename T>
 void swap(SinglyLinkedList<T>& a, SinglyLinkedList<T>& b) noexcept {
     a.swap(b);
 }
-
 //#include "linked_list.hpp"
 #include <iostream>
 #include <string>

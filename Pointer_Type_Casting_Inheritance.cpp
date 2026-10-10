@@ -63,17 +63,28 @@ int main() {
     a1->speak();                                // "Rex says Woof!"  (virtual dispatch)
     a2->speak();
     // a1->fetch();                             // ❌ compile error: Animal has no fetch()
+    demonstrateOverride(*a2);
 
     // ── 2. Static downcasting (Animal* -> Dog*), NO runtime check ────
-    std::cout << "\n== Static downcasting ==\n";
+    std::cout << "\n== Static downcasting (safe) ==\n";
     Dog* d1 = static_cast<Dog*>(a1);            // OK: a1 really points to a Dog
     d1->fetch();                                // "Rex fetches the ball"
+    d1->describe();
+    demonstrateOverride(*d1);
 
-    Animal* a3 = &tom;
-    // Dog* bad = static_cast<Dog*>(a3);        // ⚠️ compiles, but a3 is a Cat!
-    // bad->fetch();                            //    undefined behavior
+    // ── 3. Static downcasting (Animal* -> Dog*), UB ──────────────────
+    // a3 points to a plain Animal — NOT a Dog. static_cast has no runtime
+    // check, so it blindly reinterprets the Animal's memory as a Dog.
+    // Calling fetch() is undefined behavior: the vtable and data layout of
+    // a plain Animal object do not match what Dog::fetch() expects.
+    std::cout << "\n== Static downcasting (undefined behavior) ==\n";
+    Animal base("BaseOnly");
+    Animal* a3 = &base;                         // points to a plain Animal, not a Dog
+    Dog* bad = static_cast<Dog*>(a3);           // compiles: downcast is syntactically valid,
+                                                // but the object is not a Dog
+    bad->fetch();                               // ⚠️ UNDEFINED BEHAVIOR
 
-    // ── 3. dynamic_cast: checked at runtime ──────────────────────────
+    // ── 4. dynamic_cast: checked at runtime ──────────────────────────
     std::cout << "\n== dynamic_cast ==\n";
     Animal* zoo[] = { &rex, &tom };
 
@@ -88,7 +99,7 @@ int main() {
 
     // Reference version: failure throws std::bad_cast instead of returning null
     try {
-        Dog& dref = dynamic_cast<Dog&>(*a3);    // a3 is a Cat
+        Dog& dref = dynamic_cast<Dog&>(*a3);    // a3 is a plain Animal
         dref.fetch();
     } catch (const std::bad_cast& e) {
         std::cout << "Reference cast failed: " << e.what() << "\n";

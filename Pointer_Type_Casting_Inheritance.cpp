@@ -11,6 +11,7 @@ public:
     virtual ~Animal() = default;                    // virtual dtor: required for a base class
 
     virtual void speak() const { std::cout << name_ << " makes a sound\n"; }
+    void describe() const { std::cout << name_ << " is an animal\n"; }  // NOT virtual
     const std::string& name() const { return name_; }
 
 private:
@@ -23,6 +24,10 @@ public:
 
     void speak() const override { std::cout << name() << " says Woof!\n"; }
     void fetch() const { std::cout << name() << " fetches the ball\n"; }   // Dog-only
+
+    // Same signature as Animal::describe(), but Animal's isn't virtual, so this
+    // HIDES it rather than overriding it. (Adding `override` here would not compile.)
+    void describe() const { std::cout << name() << " is a dog\n"; }
 };
 
 class Cat : public Animal {
@@ -32,9 +37,24 @@ public:
     void speak() const override { std::cout << name() << " says Meow!\n"; }
 };
 
+// Takes ANY Animal by reference. Which functions run depends on whether they're virtual.
+void demonstrateOverride(const Animal& a) {
+    a.speak();      // virtual    -> chosen at RUNTIME by the object's real type (override)
+    a.describe();   // non-virtual -> chosen at COMPILE TIME by the reference type (Animal)
+}
+
 int main() {
     Dog rex("Rex");
     Cat tom("Tom");
+
+    // ── 0. Overriding vs. hiding ─────────────────────────────────────
+    std::cout << "== Overrides ==\n";
+    Animal generic("Generic");
+    demonstrateOverride(generic);   // Animal::speak,  Animal::describe
+    demonstrateOverride(rex);       // Dog::speak,     Animal::describe  (!)
+    demonstrateOverride(tom);       // Cat::speak,     Animal::describe
+    rex.describe();                 // Dog::describe: called directly on a Dog
+    std::cout << "\n";
 
     // ── 1. Static upcasting (Dog* -> Animal*) ─────────────────────────
     std::cout << "== Upcasting ==\n";

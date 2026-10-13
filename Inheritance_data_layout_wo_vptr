@@ -6,7 +6,7 @@ class Base {
 public:
     char a;
     char b;
-
+    Base(char a =0, char b=0): a(a), b(b) {}
     void print() { std::cout << "Base::print\n"; }
 };
 
@@ -16,20 +16,41 @@ public:
     char c;
     char d;
     char e;
+    Derived(char a =0, char b = 0, char c=0, char d=0, char e=0):Base(a,b), c(c), d(d), e(e){}
+    void print() { std::cout << "Derived::print\n"; }
 };
 
 // Multiple inheritance
 class Other {
 public:
     char x;
+    Other(char i=0):x(i){}
+    void print() { std::cout << "Other::print\n"; }
 };
 
 class MultiDerived : public Base, public Other {
 public:
     char y;
+    MultiDerived(char a=0, char b=0, char x=0, char y=0): Base(a, b), Other(x), y(y){}
 };
 
 int main() {
+
+    Base b('1','2');
+    Derived d('3','4','5');
+    Other o('6');
+    MultiDerived md('a','b','c','d');
+    b.print();
+    d.print();
+    o.print();
+    Base *pb;
+    Other *px;
+    //pb = & md; 
+    //px = &md;
+    pb->print();
+    //md.print();
+    //std::cout << "I am here " << pb->a << std::endl; 
+    //std::cout << "I am here " << px->x << std::endl; 
     std::cout << "==== Sizes ====\n";
     std::cout << "sizeof(Base)        = " << sizeof(Base) << "\n";
     std::cout << "sizeof(Derived)     = " << sizeof(Derived) << "\n";

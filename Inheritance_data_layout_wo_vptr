@@ -49,6 +49,14 @@ int main() {
     //px = &md;
     pb->print();
     //md.print();
+
+    //unique_ptr<Base>        spb  = make_unique<Base>('1', '2');
+    //unique_ptr<Derived>     spd  = make_unique<Derived>('3', '4', '5');
+    //unique_ptr<Other>       spo  = make_unique<Other>('6');
+    //unique_ptr<MultiDerived> spmd = make_unique<MultiDerived>('a', 'b', 'c', 'd');
+
+    //pb = spmd.get(); 
+
     //std::cout << "I am here " << pb->a << std::endl; 
     //std::cout << "I am here " << px->x << std::endl; 
     std::cout << "==== Sizes ====\n";
